@@ -5,11 +5,32 @@ import { ErrorMapper } from "utils/ErrorMapper";
 export const loop = ErrorMapper.wrapLoop(() => {
   console.log(`Current game tick is ${Game.time}`);
 
-  // Automatically delete memory of missing creeps
-  for (const name in Memory.creeps) {
-    if (!(name in Game.creeps)) {
-      delete Memory.creeps[name];
-    }
-  }
+  nationManager.cleanDeadCreepsFromMemory();
 
+  for (let rm in Game.rooms) {
+    let room = Game.rooms[rm];
+
+    // Initialize the variables of the room if needed
+    if (roomManager.needsInitialization(room)) {
+      roomManager.initialize(room);
+    }
+
+    // Initialize status for this tick
+    roomManager.setCurrentStatus(room);
+
+    // log status
+    const interval = 15;
+    if (Game.time % interval == 0) {
+      let logObject = roomManager.getRoomLog(room);
+      console.log(JSON.stringify(logObject));
+    }
+    // Address any attackers
+    roomManager.defend(room);
+
+    // Update number of creeps and their functions
+    roomManager.configure(room);
+
+    // Manage creep actions
+    roomManager.processCreeps(room);
+  }
 });

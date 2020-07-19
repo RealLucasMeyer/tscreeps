@@ -1,12 +1,3 @@
-// creeper management
-var roleHarvester = require('role.harvester');
-var roleUpgrader = require('role.upgrader');
-var roleBuilder = require('role.builder');
-var roleRepairer = require('role.repairer');
-var roleCarrier = require('role.carrier');
-var roleSigner = require('role.signer');
-var roleMiner = require('role.miner');
-
 function refillWorkers(room: Room): void {
 
     let newName = 'Worker' + Game.time;
@@ -144,7 +135,7 @@ function getRepairTargets(room: Room): Array<Id<Structure>> {
     let rcl = room.controller?.level; if (rcl == undefined) rcl = -1;
 
     // add all walls and ramparts regardless of size when room changes level
-    if (room.memory.previousTickControlLevel < rcl) {
+    if (room.memory.previousTickControllerLevel < rcl) {
         repairWallIDs = findNeedsRepair(room, STRUCTURE_WALL, WALL_HITS_MAX);
         repairRampartIDs = findNeedsRepair(room, STRUCTURE_RAMPART, RAMPART_HITS_MAX[rcl]);
     } else {
@@ -233,16 +224,16 @@ function creepRun(creep: Creep) {
         console.log("Unknown creep role");
 }
 
-function spawnCreep(spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepRole:string, creepName:string, creepSource = -1) {
-    let mem : CreepMemory = {
-        role : creepRole,
+function spawnCreep(spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepRole: string, creepName: string, creepSource = -1) {
+    let mem: CreepMemory = {
+        role: creepRole,
         source: creepSource
     }
 
     return spawner.spawnCreep(parts, creepName, { memory: mem });
 }
 
-function spawnHarvester(room : Room, spawner : StructureSpawn, parts: Array<BodyPartConstant>, creepName: string) {
+function spawnHarvester(room: Room, spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepName: string) {
 
     // check to see if we have too many creeps in the same source
     // TODO: stop using romm.memory.currentSourceTarget
@@ -295,14 +286,14 @@ function spawnMiner(room: Room, spawner: StructureSpawn, parts: Array<BodyPartCo
     }
 }
 
-function getOptimalRoomConfiguration(room: Room) : RoomConfiguration {
+function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
 
-    let objDefense : RoomDefenseConfiguration = {
-        wallHitPoints : 0,
+    let objDefense: RoomDefenseConfiguration = {
+        wallHitPoints: 0,
         rampartHitPoints: 0,
         defenders: 0,
-        rangedDefenders: 0, 
-        repairThreshold : 0.1
+        rangedDefenders: 0,
+        repairThreshold: 0.1
     };
 
     let objMaintenance: RoomMaintenanceConfiguration = {
@@ -310,8 +301,8 @@ function getOptimalRoomConfiguration(room: Room) : RoomConfiguration {
     };
 
     let objRoomCreeps: RoomCreepConfiguration = {
-        workers : 0,
-        miners : 0
+        workers: 0,
+        miners: 0
     }
 
     switch (room.controller?.level) {
@@ -377,16 +368,12 @@ function getOptimalRoomConfiguration(room: Room) : RoomConfiguration {
 
 var roomManager = {
 
-    needsInitialization: function (room: Room) : boolean {
+    needsInitialization: function (room: Room): boolean {
 
         let refresh = false;
 
         // update configurations after a set amount of time, just in case
         if (Game.time % 100 == 0) refresh = true;
-
-        // check if we had substantial changes in the room
-        if (room.memory.previousTickStructures != room.find(FIND_STRUCTURES).length) refresh = true;
-        if (room.memory.previousTickControlLevel != room.controller?.level) refresh = true;
 
         // defensive code to prevent some room variables from being empty
         if (room.memory.sortedSourcesArrayIDs === undefined) refresh = true;
@@ -399,7 +386,7 @@ var roomManager = {
 
     },
 
-    initialize: function (room : Room) : void {
+    initialize: function (room: Room): void {
 
         // initialize sources array variables
         let sortedSourcesArray = getSortedSourcesArray(room);
@@ -407,8 +394,8 @@ var roomManager = {
 
     },
 
-    setCurrentStatus: function (room : Room) {
-        
+    setCurrentStatus: function (room: Room) {
+
         // Find mining containers
         room.memory.miningContainerIDs = findMiningContainers(room);
 
@@ -433,6 +420,7 @@ var roomManager = {
 
         // get creeps and worker lists
         let allCreeps = room.find(FIND_MY_CREEPS);
+        room.memory.creepIDs = allCreeps.map(c => c.id);
 
         let workers = _.filter(allCreeps, creep => creep.memory.role == 'harvester' || creep.memory.role == 'builder' || creep.memory.role == 'upgrader' ||
             creep.memory.role == 'repairer' || creep.memory.role == 'carrier' || creep.memory.role == 'signer');
@@ -447,48 +435,48 @@ var roomManager = {
 
         // energy targets
         // check if spawner is full
-        let energyTargets = getEnergyTargets(room);
-
-        // save the number of structures and the current control level (needsInitialization() checks if these change)
-        room.memory.previousTickStructures = room.find(FIND_STRUCTURES).length;
+        room.memory.nOpenEnergyTargets = getEnergyTargets(room).length;
     },
 
-    getRoomLog: function (room) {
+    getRoomLog: function (room: Room) {
 
-        let logObject = {};
-        logObject.gameTime = Game.time;
-        logObject.roomName = room.name;
-        logObject.roomLevel = room.controller.level;
-        logObject.isNearDecay = room.memory.isNearControllerDecay;
-        logObject.energyCapacity = room.memory.energyCapacity;
-        logObject.energyAvailable = room.memory.energyAvailable;
-        logObject.roomCreeps = room.memory.creepCount;
-        logObject.creepMap = room.memory.creepMap;
+        const rcl = room.controller?.level === undefined ? 0 : room.controller!.level;
+
+        let logObject: LogObject = {
+            gameTime: Game.time,
+            roomName: room.name,
+            roomLevel: rcl,
+            isNearDecay: room.memory.isNearControllerDecay,
+            energyCapacity: room.memory.energyCapacity,
+            energyAvailable: room.memory.energyAvailable,
+            roomCreeps: room.memory.workerIDs.length + room.memory.minerIDs.length,
+            creepMap: room.memory.creepMap,
+        }
 
         return logObject;
 
     },
 
-    defend: function (room) {
+    defend: function (room: Room) {
         // TODO: improve the basic room defense below
         var hostiles = room.find(FIND_HOSTILE_CREEPS);
         if (hostiles.length > 0) {
             var username = hostiles[0].owner.username;
             Game.notify(`User ${username} spotted in room ${room.name}`);
-            var towers = room.find(
-                FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_TOWER } });
+            var towers: Array<StructureTower> = room.find(
+                FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_TOWER } }) as Array<StructureTower>;
             towers.forEach(tower => tower.attack(hostiles[0]));
         }
     },
 
-    processCreeps: function (room) {
+    processCreeps: function (room: Room) {
 
         // TODO: I don't like this way of getting the creeps
-        let roomCreeps = room.memory.creepIDs.map(s => Game.getObjectById(s));
+        let roomCreeps = room.memory.creepIDs.map(s => Game.getObjectById(s)) as Array<Creep>;
 
         // Go over all creeps in this room and update their roles
         for (let i = 0; i < roomCreeps.length; i++) {
-            let creep = roomCreeps[i];
+            let creep: Creep = roomCreeps[i];
 
             // if the creep has no role, complain
             if (creep.memory === undefined) {
@@ -536,7 +524,8 @@ var roomManager = {
                     creep.memory.role = 'builder';
                 }
 
-                else if (room.controller.sign.username != "FabianMontescu") {
+                // if there's a room controller and its sign username is not "FabianMontescu", then sign
+                else if (!room.controller === undefined && room.controller?.sign?.username != "FabianMontescu") {
                     if (creep.memory.role != 'signer')
                         creep.say('sign');
                     creep.memory.role = 'signer';
@@ -554,15 +543,14 @@ var roomManager = {
 
     },
 
-    configure: function (room) {
-        let optimalCreepConfiguration = room.memory.optimalRoomConfiguration.creeps;
+    configure: function (room: Room) {
+        let optimalCreepConfiguration = room.memory.optimalRoomConfiguration.creepConfiguration;
 
-        if (room.memory.workerCount < optimalCreepConfiguration.workers) {
+        if (room.memory.workerIDs.length < optimalCreepConfiguration.workers) {
             refillWorkers(room);
         }
 
-        if (room.memory.minerCount < optimalCreepConfiguration.miners) {
-            console.log("Refilling miners because room has " + room.memory.minerCount + " miners and wants " + optimalCreepConfiguration.miners);
+        if (room.memory.minerIDs.length < optimalCreepConfiguration.miners) {
             refillMiners(room);
         }
     }

@@ -1,3 +1,4 @@
+
 // example declaration file - remove these and add your own custom typings
 
 // memory extension samples
@@ -37,19 +38,33 @@ interface RoomDefenseConfiguration {
 interface RoomMemory {
   controlLevel: number;
   creepMap: CreepTypeCounter;
+  creepIDs: Array<Id<Creep>>;
   energyCapacity: number;
   energyAvailable: number;
   hasBuildTargets: boolean;
-  isNearControllerDecay : boolean;
+  isNearControllerDecay: boolean;
   minerIDs: Array<Id<Creep>>;
   miningContainerIDs: Array<Id<StructureContainer>>;
+  nOpenEnergyTargets: number;
   optimalCreepConfiguration: RoomConfiguration;
   optimalRoomConfiguration: RoomConfiguration;
-  previousTickStructures: number;
+  previousTickControllerLevel: number;
   repairTargetIDs: Array<Id<Structure>>;
   sortedSourcesArrayIDs: Array<Id<Source>>;
   spawn: StructureSpawn;
   workerIDs: Array<Id<Creep>>;
+}
+
+interface LogObject {
+  gameTime: number;
+  roomName: string;
+  roomLevel: number;
+  isNearDecay: boolean;
+  energyCapacity: number;
+  energyAvailable: number;
+  roomCreeps: number;
+  creepMap: CreepTypeCounter;
+
 }
 
 interface CreepTypeCounter {
