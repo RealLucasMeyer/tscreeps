@@ -1,7 +1,5 @@
 var roleUpgrader = {
 
-    /** @param {Creep} creep **/
-
     run:
         function (creep: Creep) {
             if (creep.room.controller === undefined) {
@@ -13,4 +11,4 @@ var roleUpgrader = {
         }
 };
 
-module.exports = roleUpgrader;
+export default roleUpgrader;

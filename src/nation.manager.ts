@@ -11,4 +11,4 @@ var nationManager = {
 
 };
 
-module.exports = nationManager;
+export default nationManager;

@@ -1,3 +1,14 @@
+import roleBuilder from "role.builder";
+import roleCarrier from "role.carrier";
+import roleHarvester from "role.harvester";
+import roleMiner from "role.miner";
+import roleRepairer from "role.repairer";
+import roleSigner from "role.signer";
+import roleUpgrader from "role.upgrader";
+
+
+import _ from "lodash";
+
 function refillWorkers(room: Room): void {
 
     let newName = 'Worker' + Game.time;
@@ -328,7 +339,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 50000;
             objDefense.rampartHitPoints = 25000;
 
-            objRoomCreeps.workers = 8;
+            objRoomCreeps.workers = 6;
             objRoomCreeps.miners = 2;
             break;
         case 4:
@@ -336,7 +347,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 100000;
             objDefense.rampartHitPoints = 50000;
 
-            objRoomCreeps.workers = 8;
+            objRoomCreeps.workers = 6;
             objRoomCreeps.miners = 2;
             break;
         case 5:
@@ -373,11 +384,21 @@ var roomManager = {
         let refresh = false;
 
         // update configurations after a set amount of time, just in case
-        if (Game.time % 100 == 0) refresh = true;
+        if (Game.time % 100 == 0) {
+            console.log("Refreshing room configuration since it's been too long");
+            refresh = true;
+        }
 
         // defensive code to prevent some room variables from being empty
-        if (room.memory.sortedSourcesArrayIDs === undefined) refresh = true;
-        if (room.memory.optimalCreepConfiguration === undefined) refresh = true;
+        if (room.memory.sortedSourcesArrayIDs === undefined) {
+            console.log("Refreshing room configuration since there no sorted sources")
+            refresh = true;
+        }
+
+        if (room.memory.optimalRoomConfiguration === undefined) {
+            console.log("Refreshing room configuration since there's no optimal room configuration")
+            refresh = true;
+        }
 
         // if we are reinitializing the room, log an event
         if (refresh) console.log("Updating room configuration");
@@ -557,7 +578,7 @@ var roomManager = {
 
 };
 
-module.exports = roomManager;
+export default roomManager;
 
 /*
         let canClaim = workers.length >= DESIRED_WORKERS;

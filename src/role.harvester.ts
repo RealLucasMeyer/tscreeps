@@ -1,6 +1,5 @@
 var roleHarvester = {
 
-    /** @param {Creep} creep **/
     run: function (creep: Creep) {
 
         // while has free capacity
@@ -26,4 +25,4 @@ var roleHarvester = {
     }
 };
 
-module.exports = roleHarvester;
+export default roleHarvester;

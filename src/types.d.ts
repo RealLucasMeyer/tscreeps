@@ -46,7 +46,6 @@ interface RoomMemory {
   minerIDs: Array<Id<Creep>>;
   miningContainerIDs: Array<Id<StructureContainer>>;
   nOpenEnergyTargets: number;
-  optimalCreepConfiguration: RoomConfiguration;
   optimalRoomConfiguration: RoomConfiguration;
   previousTickControllerLevel: number;
   repairTargetIDs: Array<Id<Structure>>;

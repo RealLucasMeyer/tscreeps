@@ -1,6 +1,5 @@
 var roleCarrier = {
 
-    /** @param {Creep} creep **/
     run: function (creep: Creep) {
 
         // find all structures that are spawns and extensions that can be filled with energy
@@ -17,4 +16,4 @@ var roleCarrier = {
 
 };
 
-module.exports = roleCarrier;
+export default roleCarrier;
