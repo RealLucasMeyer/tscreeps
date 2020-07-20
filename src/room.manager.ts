@@ -316,6 +316,8 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
         miners: 0
     }
 
+    const numMiningContainers = room.memory.miningContainerIDs.length;
+
     switch (room.controller?.level) {
         case 0:
             objMaintenance.repairThreshold = 0.0;
@@ -323,7 +325,8 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
         case 1:
             // this is usually really quick
             objMaintenance.repairThreshold = 0.0;
-            objRoomCreeps.workers = 4;
+            objRoomCreeps.workers = 4 - numMiningContainers;
+            objRoomCreeps.miners = numMiningContainers;
             break;
         case 2:
             // can potentially build walls
@@ -332,39 +335,40 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
 
             objMaintenance.repairThreshold = 0.05;
 
-            objRoomCreeps.workers = 8;
+            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.miners = numMiningContainers;
             break;
         case 3:
             // should probably build walls
             objDefense.wallHitPoints = 50000;
             objDefense.rampartHitPoints = 25000;
 
-            objRoomCreeps.workers = 6;
-            objRoomCreeps.miners = 2;
+            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.miners = numMiningContainers;
             break;
         case 4:
             // bigger walls
             objDefense.wallHitPoints = 100000;
             objDefense.rampartHitPoints = 50000;
 
-            objRoomCreeps.workers = 6;
-            objRoomCreeps.miners = 2;
+            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.miners = numMiningContainers;
             break;
         case 5:
             // even bigger walls
             objDefense.wallHitPoints = 200000;
             objDefense.rampartHitPoints = 100000;
 
-            objRoomCreeps.workers = 6;
-            objRoomCreeps.miners = 2;
+            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.miners = numMiningContainers;
             break;
         case 6:
             // even bigger walls
             objDefense.wallHitPoints = 400000;
             objDefense.rampartHitPoints = 200000;
 
-            objRoomCreeps.workers = 6;
-            objRoomCreeps.miners = 2;
+            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.miners = numMiningContainers;
             break;
     }
 
