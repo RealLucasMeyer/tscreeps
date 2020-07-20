@@ -68,7 +68,7 @@ function refillMiners(room: Room): void {
     let roomEnergyCapacity = room.memory.energyCapacity;
 
     // Build only when the room is full of energy
-    if (roomEnergyCapacity >= 650 && !spawner.spawning) {
+    if (!spawner.spawning) {
         if (roomEnergyCapacity >= 650) {
             spawnMiner(room, spawner, [MOVE, MOVE, MOVE, WORK, WORK, WORK, WORK, WORK], newName);
         }
