@@ -6,7 +6,6 @@ var roleHarvester = {
         if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
 
             if (creep.room.memory.minerIDs.length == 0) {
-                console.log("harvest mining");
                 let sources = creep.room.find(FIND_SOURCES);
 
                 if (creep.harvest(sources[creep.memory.source]) == ERR_NOT_IN_RANGE) {
