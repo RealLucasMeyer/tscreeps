@@ -336,7 +336,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
 
             objMaintenance.repairThreshold = 0.05;
 
-            objRoomCreeps.workers = 12 - numMiningContainers;
+            objRoomCreeps.workers = 14 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 3:
