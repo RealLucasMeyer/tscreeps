@@ -5,11 +5,15 @@
 interface CreepMemory {
   role: string;
   source: number;
+  room: string;
 }
 
 interface Memory {
   uuid: number;
   log: any;
+  ownedRoomIDs: string[];
+  expansionRoomIDs: string[];
+  expansionTaskList: Array<ExpansionTask>;
 }
 
 interface RoomMaintenanceConfiguration {
@@ -75,6 +79,22 @@ interface CreepTypeCounter {
   signers: number;
   claimers: number;
   miners: number;
+}
+
+// TODO: convert expansionType to numeric constant
+interface ExpansionTask {
+  sourceRoomName: string;
+  destinationRoomName: string;
+  expansionType: string;
+  status: string;
+  lastCreepSent: number;
+  estimatedCompletion: number; // after this time, wasteful to send creeps
+  estimatedLoss: number; // need to send creeps before this time
+}
+
+interface ExpansionStatus {
+  roomName: string;
+  expansionType: string;
 }
 
 // `global` extension samples

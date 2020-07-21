@@ -6,7 +6,6 @@ import roleRepairer from "role.repairer";
 import roleSigner from "role.signer";
 import roleUpgrader from "role.upgrader";
 
-
 import _ from "lodash";
 
 function refillWorkers(room: Room): void {
@@ -75,8 +74,8 @@ function refillMiners(room: Room): void {
         else if (roomEnergyCapacity >= 550) {
             spawnMiner(room, spawner, [MOVE, WORK, WORK, WORK, WORK, WORK], newName);
         }
-        else {
-            Game.notify("Attempted to spawn miner without having enough energy");
+        else if (roomEnergyCapacity >= 400) {
+            spawnMiner(room, spawner, [MOVE, MOVE, WORK, WORK, WORK], newName)
         }
     }
 
@@ -137,8 +136,8 @@ function getRepairTargets(room: Room): Array<Id<Structure>> {
     _.pullAll(repairTargetsIDs, notInRoom);
 
     // get structures in need of repair (only check for roads, walls and ramparts)
-    let repairRoadIDs = findNeedsRepair(room, STRUCTURE_ROAD, ROAD_HITS * 0.2);
-    let repairContainerIDs = findNeedsRepair(room, STRUCTURE_CONTAINER, CONTAINER_HITS * 0.2);
+    let repairRoadIDs = findNeedsRepair(room, STRUCTURE_ROAD, ROAD_HITS * defenseConfiguration.repairThreshold);
+    let repairContainerIDs = findNeedsRepair(room, STRUCTURE_CONTAINER, CONTAINER_HITS * defenseConfiguration.repairThreshold);
     let repairWallIDs = [];
     let repairRampartIDs = [];
 
@@ -235,10 +234,12 @@ function creepRun(creep: Creep) {
         console.log("Unknown creep role");
 }
 
-function spawnCreep(spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepRole: string, creepName: string, creepSource = -1) {
+function spawnCreep(spawner: StructureSpawn, parts: Array<BodyPartConstant>,
+    creepRole: string, creepName: string, creepSource: number = -1, creepRoom: string = "") {
     let mem: CreepMemory = {
         role: creepRole,
-        source: creepSource
+        source: creepSource,
+        room: creepRoom == "" ? spawner.room.name : creepRoom
     }
 
     return spawner.spawnCreep(parts, creepName, { memory: mem });
@@ -335,7 +336,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
 
             objMaintenance.repairThreshold = 0.05;
 
-            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.workers = 12 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 3:

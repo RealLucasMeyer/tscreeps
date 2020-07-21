@@ -8,6 +8,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   console.log(`Current game tick is ${Game.time}`);
 
   nationManager.cleanDeadCreepsFromMemory();
+  nationManager.updateStatus();
 
   for (let rm in Game.rooms) {
     let room = Game.rooms[rm];
