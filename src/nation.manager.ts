@@ -30,7 +30,6 @@ var nationManager = {
         let ownedRooms = _.flatMap(Game.rooms) as Room[];
         _.remove(ownedRooms, r => r.controller === undefined || r.controller.level <= 0); // remove unowned;
 
-
         let ownedRoomIDs = _.map(ownedRooms, o => o.name);
         Memory.ownedRoomIDs = ownedRoomIDs;
 
@@ -40,6 +39,11 @@ var nationManager = {
 
         if (Memory.expansionTaskList === undefined)
             Memory.expansionTaskList = [];
+
+        if (Game.time == 38697415) {
+            Memory.expansionRoomIDs = ["W66S28"];
+        }
+
     },
 
     planExpansion: function (): void {

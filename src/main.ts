@@ -1,6 +1,7 @@
 import { ErrorMapper } from "utils/ErrorMapper";
 import nationManager from "nation.manager";
 import roomManager from "room.manager";
+import { runInThisContext } from "vm";
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
@@ -18,8 +19,14 @@ export const loop = ErrorMapper.wrapLoop(() => {
       roomManager.initialize(room);
     }
 
+    // Create construction sites according to plan
+    roomManager.processBuildTasks(room);
+
     // Initialize status for this tick
     roomManager.setCurrentStatus(room);
+
+    // For testing stuff
+    roomManager.manualCommand(room);
 
     // log status
     const interval = 15;

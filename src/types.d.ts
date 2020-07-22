@@ -39,7 +39,16 @@ interface RoomDefenseConfiguration {
   rangedDefenders: number;
 }
 
+interface BuildTask {
+  x: number;
+  y: number;
+  minRCL: number;
+  minGameTime: number; // for future use
+  structureType: BuildableStructureConstant;
+}
+
 interface RoomMemory {
+  buildTaskList: Array<BuildTask>;
   controlLevel: number;
   creepMap: CreepTypeCounter;
   creepIDs: Array<Id<Creep>>;
@@ -47,6 +56,8 @@ interface RoomMemory {
   energyAvailable: number;
   hasBuildTargets: boolean;
   isNearControllerDecay: boolean;
+  nextBuildTime: number;
+  nextBuildRCL: number;
   minerIDs: Array<Id<Creep>>;
   miningContainerIDs: Array<Id<StructureContainer>>;
   nOpenEnergyTargets: number;

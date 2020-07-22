@@ -5,8 +5,27 @@ import roleMiner from "role.miner";
 import roleRepairer from "role.repairer";
 import roleSigner from "role.signer";
 import roleUpgrader from "role.upgrader";
+import roleClaimer from "role.claimer";
 
-import _ from "lodash";
+import _, { pullAll } from "lodash";
+
+function spawnClaimer(room: Room, targetRoom: string) {
+
+    let newName = 'Claimer' + Game.time;
+    let spawner = room.find(FIND_MY_SPAWNS)[0];
+
+    // TODO: only create claimers when needed, for now, manual
+    let parts = [MOVE, CLAIM];
+    let spawnResult = spawner.spawnCreep(parts, newName,
+        { memory: { role: 'claimer', room: targetRoom, source: 0 } });
+
+    if (spawnResult == OK) {
+        console.log("Created new claimer");
+    }
+    else {
+        console.log("Claimer spawn failed with code " + spawnResult);
+    }
+}
 
 function refillWorkers(room: Room): void {
 
@@ -14,6 +33,11 @@ function refillWorkers(room: Room): void {
     let spawner = room.memory.spawn;
     let roomEnergyCapacity = room.memory.energyCapacity;
     let roomEnergyAvailable = room.memory.energyAvailable;
+
+    // need this when expanding to a new room
+    if (spawner == undefined)
+        return;
+
 
     // Build only when the room is full of energy
     if (roomEnergyCapacity == roomEnergyAvailable && !spawner.spawning) {
@@ -44,8 +68,8 @@ function refillWorkers(room: Room): void {
         }
         // Adding 550 because that's the capacity of RCL 2
         else if (roomEnergyCapacity >= 550) {
-            spawnHarvester(room, spawner, [WORK, WORK, WORK,
-                CARRY, CARRY,
+            spawnHarvester(room, spawner, [WORK, WORK,
+                CARRY, CARRY, CARRY, CARRY,
                 MOVE, MOVE, MOVE], newName);
         }
         else if (roomEnergyCapacity >= 400) {
@@ -230,6 +254,10 @@ function creepRun(creep: Creep) {
         roleSigner.run(creep);
     else if (creep.memory.role == "miner")
         roleMiner.run(creep);
+    else if (creep.memory.role == "claimer") {
+        console.log("Trying to process claimer move");
+        roleClaimer.run(creep);
+    }
     else
         console.log("Unknown creep role");
 }
@@ -242,31 +270,37 @@ function spawnCreep(spawner: StructureSpawn, parts: Array<BodyPartConstant>,
         room: creepRoom == "" ? spawner.room.name : creepRoom
     }
 
+    if (spawner === undefined) {
+        console.log("No spawner");
+        return;
+    }
+
     return spawner.spawnCreep(parts, creepName, { memory: mem });
 }
 
-function spawnHarvester(room: Room, spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepName: string) {
-
-    // check to see if we have too many creeps in the same source
-    // TODO: stop using romm.memory.currentSourceTarget
-    let ci: Array<Id<Creep>> = room.memory.workerIDs;
-    let c: Array<Creep> = ci.map(Game.getObjectById) as Array<Creep>;
+function spawnHarvester(room: Room, spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepName: string, creepRoom: string = "", creepSourceIndex: number = -1) {
 
     let counter = 0;
-    for (let i = 0; i < c.length; i++) {
-        if (c[i].memory.source == 1)
-            counter++;
+    let src = -1;
+
+    if (creepSourceIndex == -1) {
+        let ci: Array<Id<Creep>> = room.memory.workerIDs;
+        let c: Array<Creep> = ci.map(Game.getObjectById) as Array<Creep>;
+
+        for (let i = 0; i < c.length; i++) {
+            if (c[i].memory.source == 1)
+                counter++;
+        }
+        if (counter > (c.length / 2.0)) // have lots of 1s
+            src = 0;
+        else
+            src = 1;
+    }
+    else {
+        src = creepSourceIndex;
     }
 
-    console.log("Spawn counter: " + counter + " - " + c.length);
-
-    let src: number = 0;
-    if (counter > (c.length / 2.0)) // have lots of 1s
-        src = 0;
-    else
-        src = 1;
-
-    let spawnResult = spawnCreep(spawner, parts, 'harvester', creepName + '-' + src, src);
+    let spawnResult = spawnCreep(spawner, parts, 'harvester', creepName + '-' + src, src, creepRoom);
 
     if (spawnResult == OK) {
         console.log("Created new worker with source " + src);
@@ -276,7 +310,8 @@ function spawnHarvester(room: Room, spawner: StructureSpawn, parts: Array<BodyPa
     }
 }
 
-function spawnMiner(room: Room, spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepName: string) {
+function spawnMiner(room: Room, spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepName: string, creepRoom: string = "") {
+
 
     // TODO: only works for up to two miners
     let miners = room.memory.minerIDs.map(Game.getObjectById) as Array<Creep>;
@@ -291,7 +326,7 @@ function spawnMiner(room: Room, spawner: StructureSpawn, parts: Array<BodyPartCo
         if (currentIndex == 1) sourceIndex = 0;
     }
 
-    let spawnResult = spawnCreep(spawner, parts, 'miner', creepName + '-' + sourceIndex, sourceIndex);
+    let spawnResult = spawnCreep(spawner, parts, 'miner', creepName + '-' + sourceIndex, sourceIndex, creepRoom);
 
     if (spawnResult != OK) {
         console.log("Miner spawn failed with code " + spawnResult);
@@ -344,7 +379,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 50000;
             objDefense.rampartHitPoints = 25000;
 
-            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.workers = 12 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 4:
@@ -352,7 +387,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 100000;
             objDefense.rampartHitPoints = 50000;
 
-            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.workers = 10 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 5:
@@ -382,7 +417,54 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
     return objRoomConfiguration;
 }
 
+function addBuildTask(room: Room, structure: BuildableStructureConstant, x: number, y: number, minRCL: number = Infinity, minTime: number = Infinity) {
+    let item: BuildTask = {
+        structureType: structure,
+        x: x,
+        y: y,
+        minRCL: minRCL,
+        minGameTime: minTime
+    }
+
+    if (room.memory.nextBuildRCL > minRCL) room.memory.nextBuildRCL = minRCL;
+    if (room.memory.nextBuildTime > minTime) room.memory.nextBuildTime = minTime;
+
+    room.memory.buildTaskList.push(item);
+}
+
 var roomManager = {
+
+    manualCommand: function (room: Room) {
+
+        if (Game.time == 38695715) {
+            room.memory.buildTaskList = [];
+
+            addBuildTask(room, STRUCTURE_ROAD, 34, 20, 2);
+            addBuildTask(room, STRUCTURE_ROAD, 33, 21, 2);
+            addBuildTask(room, STRUCTURE_ROAD, 34, 22, 2);
+            addBuildTask(room, STRUCTURE_ROAD, 35, 23, 2);
+            addBuildTask(room, STRUCTURE_ROAD, 36, 22, 2);
+
+            addBuildTask(room, STRUCTURE_TOWER, 38, 21, 3);
+
+            addBuildTask(room, STRUCTURE_EXTENSION, 37, 18, 3);
+            addBuildTask(room, STRUCTURE_EXTENSION, 36, 19, 3);
+            addBuildTask(room, STRUCTURE_EXTENSION, 37, 20, 3);
+            addBuildTask(room, STRUCTURE_EXTENSION, 38, 19, 3);
+            addBuildTask(room, STRUCTURE_EXTENSION, 37, 19, 3);
+
+        }
+
+        if (Game.time == 38700999) {
+            spawnClaimer(room, "W66S28");
+        }
+
+        if (Game.time % 500 == 0 && Game.time < 38720001) {
+            let s = room.find(FIND_MY_SPAWNS)[0];
+            spawnHarvester(room, s, [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, WORK, WORK, WORK], "expander" + Game.time, "W66S28", 0);
+        }
+
+    },
 
     needsInitialization: function (room: Room): boolean {
 
@@ -404,6 +486,14 @@ var roomManager = {
             console.log("Refreshing room configuration since there's no optimal room configuration")
             refresh = true;
         }
+
+        // check for uninitialized lists
+        if (room.memory.buildTaskList === undefined) {
+            room.memory.buildTaskList = [];
+            room.memory.nextBuildRCL = Infinity;
+            room.memory.nextBuildTime = Infinity;
+        }
+
 
         // if we are reinitializing the room, log an event
         if (refresh) console.log("Updating room configuration");
@@ -511,6 +601,11 @@ var roomManager = {
                 break;
             }
 
+            if (creep.memory.role == "claimer") {
+                creepRun(creep);
+                return;
+            }
+
             // if worker is empty, convert into harvester
             if (creep.store[RESOURCE_ENERGY] == 0) {
                 if (creep.memory.role != 'harvester') {
@@ -551,11 +646,12 @@ var roomManager = {
                 }
 
                 // if there's a room controller and its sign username is not "FabianMontescu", then sign
-                else if (!room.controller === undefined && room.controller?.sign?.username != "FabianMontescu") {
+                else if (room.controller?.sign?.username != "FabianMontescu") {
                     if (creep.memory.role != 'signer')
                         creep.say('sign');
                     creep.memory.role = 'signer';
                 }
+
                 // next priority - upgrade controller (will always decrease energy)
                 else {
                     if (creep.memory.role != 'upgrader')
@@ -579,6 +675,35 @@ var roomManager = {
         if (room.memory.minerIDs.length < optimalCreepConfiguration.miners) {
             refillMiners(room);
         }
+    },
+
+    processBuildTasks(room: Room) {
+
+        let currRCL = room.controller?.level === undefined ? 0 : room.controller.level;
+        // for now ignoring time
+
+        if (currRCL < room.memory.nextBuildRCL) return;
+
+        let remainingTasks: BuildTask[] = [];
+        let newMin = Infinity;
+
+        for (let i = 0; i < room.memory.buildTaskList.length; i++) {
+            let t: BuildTask = room.memory.buildTaskList[i];
+            console.log("Examining task:", JSON.stringify(t));
+
+            if (t.minRCL <= currRCL) {
+                room.createConstructionSite(t.x, t.y, t.structureType);
+            }
+            else {
+                if (t.minRCL < newMin)
+                    newMin = t.minRCL;
+                remainingTasks.push(t);
+            }
+        }
+
+        room.memory.buildTaskList = remainingTasks;
+        room.memory.nextBuildRCL = newMin;
+
     }
 
 };
@@ -596,10 +721,10 @@ export default roomManager;
             // TODO: only create claimers when needed, for now, manual
             // only build claimers from big rooms
             if ((roomEnergyCapacity >= 1300) && (roomEnergyAvailable >= 1300)) {
-                let parts = [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY];
-                // let parts = [MOVE, MOVE, CLAIM, CLAIM]
+                // let parts = [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY];
+                let parts = [MOVE, MOVE, CLAIM, CLAIM];
                 let spawnResult = spawner.spawnCreep(parts, newName,
-                    {memory: {role: 'expander'}});
+                    {memory: {role: 'claimer'}});
 
                 if (spawnResult == OK) {
                     console.log("Created new claimer");
