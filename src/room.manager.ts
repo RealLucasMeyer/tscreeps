@@ -516,6 +516,15 @@ function addBuildTask(room: Room, structure: BuildableStructureConstant, x: numb
 
 var roomManager = {
 
+    log: function (room: Room) {
+
+        if (room.memory.roomLog === undefined)
+            room.memory.roomLog = [];
+
+        if (room.memory.roomLog.length >= 100)
+            room.memory.roomLog.length = 99;
+    },
+
     manualCommand: function (room: Room) {
 
         if (room.name == "W66S28" && Game.time == 38747506)
