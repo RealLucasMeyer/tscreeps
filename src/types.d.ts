@@ -1,11 +1,15 @@
-
-// example declaration file - remove these and add your own custom typings
-
-// memory extension samples
 interface CreepMemory {
   role: string;
   source: number;
   room: string;
+  remoteHarvesterMemory: RemoteHarvesterMemory | null;
+}
+
+interface RemoteHarvesterMemory {
+  harvestRoom: string;
+  harvestSourceID: Id<Source> | Id<StructureContainer>;
+  deliveryRoom: string;
+  deliveryStorageID: Id<StructureStorage>
 }
 
 interface Memory {
@@ -27,8 +31,9 @@ interface RoomConfiguration {
 }
 
 interface RoomCreepConfiguration {
-  workers: number,
-  miners: number
+  workers: number;
+  miners: number;
+  remoteWorkers: number;
 }
 
 interface RoomDefenseConfiguration {
@@ -63,7 +68,9 @@ interface RoomMemory {
   nOpenEnergyTargets: number;
   optimalRoomConfiguration: RoomConfiguration;
   previousTickControllerLevel: number;
+  remoteWorkerIDs: Array<Id<Creep>>;
   repairTargetIDs: Array<Id<Structure>>;
+  roomLog: Array<RoomLogItem>;
   sortedSourcesArrayIDs: Array<Id<Source>>;
   spawn: StructureSpawn;
   workerIDs: Array<Id<Creep>>;
@@ -82,14 +89,16 @@ interface LogObject {
 }
 
 interface CreepTypeCounter {
-  harvesters: number;
-  builders: number;
-  carriers: number;
-  repairers: number;
-  upgraders: number;
-  signers: number;
-  claimers: number;
-  miners: number;
+  harvester: number;
+  builder: number;
+  carrier: number;
+  repairer: number;
+  upgrader: number;
+  signer: number;
+  claimer: number;
+  miner: number;
+  "remote harvester": number;
+  "remote carrier": number;
 }
 
 // TODO: convert expansionType to numeric constant
@@ -106,6 +115,15 @@ interface ExpansionTask {
 interface ExpansionStatus {
   roomName: string;
   expansionType: string;
+}
+
+interface RoomLogItem {
+  gameTime: number;
+  sourceCapacity0: number;
+  sourceCapacity1: number;
+  containerCapacity0: number;
+  containerCapacity1: number;
+  maxAvailableEnergy: number;
 }
 
 // `global` extension samples

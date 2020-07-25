@@ -40,9 +40,7 @@ var nationManager = {
         if (Memory.expansionTaskList === undefined)
             Memory.expansionTaskList = [];
 
-        if (Game.time == 38697415) {
-            Memory.expansionRoomIDs = ["W66S28"];
-        }
+        // TODO: remove owned rooms from expansion list
 
     },
 

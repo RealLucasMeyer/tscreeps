@@ -2,6 +2,8 @@ import _ from "lodash";
 
 function buildPriority(structureType: StructureConstant): number {
     switch (structureType) {
+        case STRUCTURE_SPAWN:
+            return 0;
         case STRUCTURE_EXTENSION:
             return 1;
         case STRUCTURE_ROAD:

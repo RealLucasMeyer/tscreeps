@@ -6,7 +6,7 @@ var roleSigner = {
                 console.log(`Attempting to sign controller at room {$room.Name} but it doesn't have a controller.`);
             }
             else {
-                let ret = creep.signController(creep.room.controller, "I'm just a n00b learning TypeScript. If you invade me... well, there's not much I can do about it, but try not to seal club me");
+                let ret = creep.signController(creep.room.controller, "n00b learning TypeScript. Invade me and... I can't do much about it, but try not to seal club me");
                 if (ret == OK || creep.room.controller.sign?.username == "FabianMontescu")
                     creep.memory.role = "harvester";
 

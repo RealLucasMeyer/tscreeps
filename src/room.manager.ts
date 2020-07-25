@@ -1,3 +1,5 @@
+import _, { pullAll } from "lodash";
+
 import roleBuilder from "role.builder";
 import roleCarrier from "role.carrier";
 import roleHarvester from "role.harvester";
@@ -6,8 +8,9 @@ import roleRepairer from "role.repairer";
 import roleSigner from "role.signer";
 import roleUpgrader from "role.upgrader";
 import roleClaimer from "role.claimer";
-
-import _, { pullAll } from "lodash";
+import roleRemoteHarvester from "role.remote.harvester";
+import roleRemoteCarrier from "role.remote.carrier";
+import { Console } from "console";
 
 function spawnClaimer(room: Room, targetRoom: string) {
 
@@ -17,7 +20,7 @@ function spawnClaimer(room: Room, targetRoom: string) {
     // TODO: only create claimers when needed, for now, manual
     let parts = [MOVE, CLAIM];
     let spawnResult = spawner.spawnCreep(parts, newName,
-        { memory: { role: 'claimer', room: targetRoom, source: 0 } });
+        { memory: { role: 'claimer', room: targetRoom, source: 0, remoteHarvesterMemory: null } });
 
     if (spawnResult == OK) {
         console.log("Created new claimer");
@@ -25,6 +28,21 @@ function spawnClaimer(room: Room, targetRoom: string) {
     else {
         console.log("Claimer spawn failed with code " + spawnResult);
     }
+}
+
+function refillRemoteWorkers(room: Room, sourceRoom: string, sourceId: Id<Source>, deliveryRoom: string, deliveryId: Id<StructureStorage>): void {
+
+    let newName = 'Remote Worker' + Game.time;
+    let spawner = room.memory.spawn;
+    let roomEnergyCapacity = room.memory.energyCapacity;
+    let roomEnergyAvailable = room.memory.energyAvailable;
+
+    if (roomEnergyCapacity == roomEnergyAvailable && !spawner.spawning && roomEnergyCapacity >= 1250) {
+        spawnRemoteWorker(room, [WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY,
+            MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE], newName,
+            sourceRoom, deliveryRoom, sourceId, deliveryId);
+    }
+
 }
 
 function refillWorkers(room: Room): void {
@@ -51,10 +69,20 @@ function refillWorkers(room: Room): void {
                 CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                 MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE], newName);
         }
+        if (roomEnergyCapacity >= 1400) {
+            spawnHarvester(room, spawner, [WORK, WORK, WORK, WORK, WORK, WORK, WORK,
+                CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
+                MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE], newName);
+        }
         else if (roomEnergyCapacity >= 1200) {
             spawnHarvester(room, spawner, [WORK, WORK, WORK, WORK, WORK, WORK,
                 CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
                 MOVE, MOVE, MOVE, MOVE, MOVE, MOVE], newName);
+        }
+        else if (roomEnergyCapacity >= 1000) {
+            spawnHarvester(room, spawner, [WORK, WORK, WORK, WORK, WORK,
+                CARRY, CARRY, CARRY, CARRY, CARRY,
+                MOVE, MOVE, MOVE, MOVE, MOVE], newName);
         }
         else if (roomEnergyCapacity >= 800) {
             spawnHarvester(room, spawner, [WORK, WORK, WORK, WORK,
@@ -212,14 +240,16 @@ function getEnergyTargets(room: Room): Array<StructureExtension | StructureSpawn
 function getCreepMap(room: Room): CreepTypeCounter {
 
     let creepMap: CreepTypeCounter = {
-        "harvesters": 0,
-        "carriers": 0,
-        "upgraders": 0,
-        "repairers": 0,
-        "claimers": 0,
-        "miners": 0,
-        "builders": 0,
-        "signers": 0
+        "harvester": 0,
+        "carrier": 0,
+        "upgrader": 0,
+        "repairer": 0,
+        "claimer": 0,
+        "miner": 0,
+        "builder": 0,
+        "signer": 0,
+        "remote harvester": 0,
+        "remote carrier": 0
     };
 
     let creeps = room.find(FIND_MY_CREEPS);
@@ -254,10 +284,12 @@ function creepRun(creep: Creep) {
         roleSigner.run(creep);
     else if (creep.memory.role == "miner")
         roleMiner.run(creep);
-    else if (creep.memory.role == "claimer") {
-        console.log("Trying to process claimer move");
+    else if (creep.memory.role == "claimer")
         roleClaimer.run(creep);
-    }
+    else if (creep.memory.role == "remote harvester")
+        roleRemoteHarvester.run(creep);
+    else if (creep.memory.role == "remote carrier")
+        roleRemoteCarrier.run(creep);
     else
         console.log("Unknown creep role");
 }
@@ -267,7 +299,8 @@ function spawnCreep(spawner: StructureSpawn, parts: Array<BodyPartConstant>,
     let mem: CreepMemory = {
         role: creepRole,
         source: creepSource,
-        room: creepRoom == "" ? spawner.room.name : creepRoom
+        room: creepRoom == "" ? spawner.room.name : creepRoom,
+        remoteHarvesterMemory: null
     }
 
     if (spawner === undefined) {
@@ -282,6 +315,12 @@ function spawnHarvester(room: Room, spawner: StructureSpawn, parts: Array<BodyPa
 
     let counter = 0;
     let src = -1;
+    let bal = 2.0;
+
+    // TODO: remove this manual adjustment
+    if (room.name == "W66S28") {
+        bal = 3.0;
+    }
 
     if (creepSourceIndex == -1) {
         let ci: Array<Id<Creep>> = room.memory.workerIDs;
@@ -308,6 +347,30 @@ function spawnHarvester(room: Room, spawner: StructureSpawn, parts: Array<BodyPa
     else {
         console.log("Worker spawn failed with code " + spawnResult);
     }
+}
+
+function spawnRemoteWorker(room: Room, parts: Array<BodyPartConstant>, creepName: string, sourceRoom: string, deliveryRoom: string, sourceId: Id<Source>, deliveryId: Id<StructureStorage>) {
+
+    let spawner = room.find(FIND_MY_SPAWNS)[0];
+
+    let mem: CreepMemory = {
+        role: "remote harvester",
+        source: -1,
+        room: spawner.room.name,
+        remoteHarvesterMemory: {
+            harvestSourceID: sourceId,
+            harvestRoom: sourceRoom,
+            deliveryRoom: deliveryRoom,
+            deliveryStorageID: deliveryId
+        }
+    }
+
+    if (spawner === undefined) {
+        console.log("No spawner");
+        return;
+    }
+
+    return spawner.spawnCreep(parts, creepName, { memory: mem });
 }
 
 function spawnMiner(room: Room, spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepName: string, creepRoom: string = "") {
@@ -349,7 +412,8 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
 
     let objRoomCreeps: RoomCreepConfiguration = {
         workers: 0,
-        miners: 0
+        miners: 0,
+        remoteWorkers: 0
     }
 
     const numMiningContainers = room.memory.miningContainerIDs.length;
@@ -371,7 +435,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
 
             objMaintenance.repairThreshold = 0.05;
 
-            objRoomCreeps.workers = 14 - numMiningContainers;
+            objRoomCreeps.workers = 10 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 3:
@@ -379,7 +443,12 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 50000;
             objDefense.rampartHitPoints = 25000;
 
-            objRoomCreeps.workers = 12 - numMiningContainers;
+            if (room.name == "W67S28")
+                objRoomCreeps.workers = 12 - numMiningContainers;
+
+            if (room.name == "W66S28")
+                objRoomCreeps.workers = 9 - numMiningContainers;
+
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 4:
@@ -387,7 +456,15 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 100000;
             objDefense.rampartHitPoints = 50000;
 
-            objRoomCreeps.workers = 10 - numMiningContainers;
+            if (room.name == "W67S28") {
+                objRoomCreeps.workers = 10 - numMiningContainers;
+                objRoomCreeps.remoteWorkers = 0;
+
+            }
+            if (room.name == "W66S28") {
+                objRoomCreeps.workers = 8 - numMiningContainers;
+            }
+
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 5:
@@ -395,10 +472,15 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 200000;
             objDefense.rampartHitPoints = 100000;
 
+            if (room.name == "W67S28") {
+                objRoomCreeps.remoteWorkers = 0;
+            }
             objRoomCreeps.workers = 8 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
             break;
         case 6:
+        case 7:
+        case 8:
             // even bigger walls
             objDefense.wallHitPoints = 400000;
             objDefense.rampartHitPoints = 200000;
@@ -436,34 +518,8 @@ var roomManager = {
 
     manualCommand: function (room: Room) {
 
-        if (Game.time == 38695715) {
-            room.memory.buildTaskList = [];
-
-            addBuildTask(room, STRUCTURE_ROAD, 34, 20, 2);
-            addBuildTask(room, STRUCTURE_ROAD, 33, 21, 2);
-            addBuildTask(room, STRUCTURE_ROAD, 34, 22, 2);
-            addBuildTask(room, STRUCTURE_ROAD, 35, 23, 2);
-            addBuildTask(room, STRUCTURE_ROAD, 36, 22, 2);
-
-            addBuildTask(room, STRUCTURE_TOWER, 38, 21, 3);
-
-            addBuildTask(room, STRUCTURE_EXTENSION, 37, 18, 3);
-            addBuildTask(room, STRUCTURE_EXTENSION, 36, 19, 3);
-            addBuildTask(room, STRUCTURE_EXTENSION, 37, 20, 3);
-            addBuildTask(room, STRUCTURE_EXTENSION, 38, 19, 3);
-            addBuildTask(room, STRUCTURE_EXTENSION, 37, 19, 3);
-
-        }
-
-        if (Game.time == 38700999) {
-            spawnClaimer(room, "W66S28");
-        }
-
-        if (Game.time % 500 == 0 && Game.time < 38720001) {
-            let s = room.find(FIND_MY_SPAWNS)[0];
-            spawnHarvester(room, s, [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, WORK, WORK, WORK], "expander" + Game.time, "W66S28", 0);
-        }
-
+        if (room.name == "W66S28" && Game.time == 38747506)
+            spawnClaimer(room, "W67S29");
     },
 
     needsInitialization: function (room: Room): boolean {
@@ -538,12 +594,15 @@ var roomManager = {
         let allCreeps = room.find(FIND_MY_CREEPS);
         room.memory.creepIDs = allCreeps.map(c => c.id);
 
-        let workers = _.filter(allCreeps, creep => creep.memory.role == 'harvester' || creep.memory.role == 'builder' || creep.memory.role == 'upgrader' ||
-            creep.memory.role == 'repairer' || creep.memory.role == 'carrier' || creep.memory.role == 'signer');
+        let workers = _.filter(allCreeps, creep => (creep.memory.role == 'harvester') || (creep.memory.role == 'builder') || (creep.memory.role == 'upgrader') ||
+            (creep.memory.role == 'repairer') || (creep.memory.role == 'carrier') || (creep.memory.role == 'signer'));
         room.memory.workerIDs = workers.map(c => c.id);
 
         let miners = _.filter(allCreeps, creep => creep.memory.role == 'miner');
         room.memory.minerIDs = miners.map(c => c.id);
+
+        let remoteWorkers = _.filter(allCreeps, creep => creep.memory.role == ("remote harvester") || (creep.memory.role == "remote carrier"));
+        room.memory.remoteWorkerIDs = remoteWorkers.map(c => c.id);
 
         // spawns
         let sp = room.find(FIND_MY_SPAWNS);
@@ -588,73 +647,88 @@ var roomManager = {
     processCreeps: function (room: Room) {
 
         // TODO: I don't like this way of getting the creeps
-        let roomCreeps = room.memory.creepIDs.map(s => Game.getObjectById(s)) as Array<Creep>;
+        let roomCreeps = room.find(FIND_MY_CREEPS);
 
         // Go over all creeps in this room and update their roles
         for (let i = 0; i < roomCreeps.length; i++) {
             let creep: Creep = roomCreeps[i];
 
+            // console.log(`Processing creep ${creep.id} with role ${creep.memory.role}`);
+            if (creep.ticksToLive == 1)
+                creep.drop(RESOURCE_ENERGY);
+
             // if the creep has no role, complain
             if (creep.memory === undefined) {
                 console.log(creep.name + " has undefined memory - actions.");
                 // TODO: complain harder with Game.notify
-                break;
+                continue;
             }
 
-            if (creep.memory.role == "claimer") {
+            let currRole = creep.memory.role;
+
+            if ((currRole == "claimer") || (currRole == "miner")) {
                 creepRun(creep);
-                return;
+                continue;
+            }
+
+            if (currRole == "remote harvester" || currRole == "remote carrier") {
+                if (creep.store[RESOURCE_ENERGY] == 0) {
+                    creep.memory.role = "remote harvester";
+                }
+                if ((currRole == "remote harvester") && (creep.store.getFreeCapacity(RESOURCE_ENERGY) == 0)) {
+                    creep.memory.role = "remote carrier"
+                }
+                creepRun(creep);
+                continue;
             }
 
             // if worker is empty, convert into harvester
             if (creep.store[RESOURCE_ENERGY] == 0) {
-                if (creep.memory.role != 'harvester') {
-                    if (creep.memory.role != "miner")
-                        creep.say("🌱 harvest");
-                }
-                if (creep.memory.role != "miner")
+                if ((currRole != 'harvester') && (currRole != "miner")) {
+                    creep.say("🌱 harvest");
                     creep.memory.role = "harvester";
+                }
             }
             // creep still has energy or if the creep is a full harvester, let's see what we can do with it
-            else if ((creep.memory.role != "harvester") || ((creep.memory.role == "harvester") && (creep.store.getFreeCapacity(RESOURCE_ENERGY) == 0))) {
+            else if ((currRole != "harvester") || ((currRole == "harvester") && (creep.store.getFreeCapacity(RESOURCE_ENERGY) == 0))) {
                 // highest priority - deliver energy to structures
                 if (room.memory.nOpenEnergyTargets) {
-                    if (creep.memory.role != 'carrier')
+                    if (currRole != 'carrier')
                         creep.say('⚡ Carry');
                     creep.memory.role = 'carrier';
                 }
 
                 // next highest priority - prevent controller decay
                 else if (room.memory.isNearControllerDecay) {
-                    if (creep.memory.role != 'upgrader')
+                    if (currRole != 'upgrader')
                         creep.say('♻️ Upgd');
                     creep.memory.role = 'upgrader';
                 }
 
                 // next highest priority - structures needing repair
                 else if (room.memory.repairTargetIDs.length > 0) {
-                    if (creep.memory.role != 'repairer')
+                    if (currRole != 'repairer')
                         creep.say('⛏️ Repair');
                     creep.memory.role = 'repairer';
                 }
 
                 // next highest priority - build new stuff
                 else if (room.memory.hasBuildTargets) {
-                    if (creep.memory.role != 'builder')
+                    if (currRole != 'builder')
                         creep.say('🚧 Build');
                     creep.memory.role = 'builder';
                 }
 
                 // if there's a room controller and its sign username is not "FabianMontescu", then sign
                 else if (room.controller?.sign?.username != "FabianMontescu") {
-                    if (creep.memory.role != 'signer')
+                    if (currRole != 'signer')
                         creep.say('sign');
                     creep.memory.role = 'signer';
                 }
 
                 // next priority - upgrade controller (will always decrease energy)
                 else {
-                    if (creep.memory.role != 'upgrader')
+                    if (currRole != 'upgrader')
                         creep.say('🎖️ Upgd');
                     creep.memory.role = 'upgrader';
                 }
@@ -667,13 +741,31 @@ var roomManager = {
 
     configure: function (room: Room) {
         let optimalCreepConfiguration = room.memory.optimalRoomConfiguration.creepConfiguration;
+        let spawner = room.find(FIND_MY_SPAWNS)[0] as StructureSpawn;
+
+        if ((room.memory.energyAvailable < room.memory.energyCapacity) || (spawner?.spawning) || (spawner == undefined))
+            return;
 
         if (room.memory.workerIDs.length < optimalCreepConfiguration.workers) {
+            console.log(`Room ${room.name} has ${room.memory.workerIDs.length} workers but wants ${optimalCreepConfiguration.workers}. Refilling.`)
             refillWorkers(room);
         }
 
         if (room.memory.minerIDs.length < optimalCreepConfiguration.miners) {
+            console.log(`Room ${room.name} has ${room.memory.minerIDs.length} miners but wants ${optimalCreepConfiguration.miners}. Refilling.`)
             refillMiners(room);
+        }
+
+        if (room.memory.remoteWorkerIDs.length < -1) {
+            console.log(`Room ${room.name} has ${room.memory.remoteWorkerIDs.length} remote workers but wants ${optimalCreepConfiguration.remoteWorkers}. Refilling.`)
+            if (room.name == "W67S28") {
+                let deliveryRoom = "W67S28";
+                let sourceRoom = "W67S27";
+                let deliveryId = "5f1964fd40824bfd04ae2fc8" as Id<StructureStorage>;
+                let sourceId = "57ef9c7a86f108ae6e60c3ea" as Id<Source>;
+                refillRemoteWorkers(room, sourceRoom, sourceId, deliveryRoom, deliveryId);
+            }
+
         }
     },
 
@@ -735,3 +827,4 @@ export default roomManager;
             }
         }
 */
+1
