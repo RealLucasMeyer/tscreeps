@@ -30,8 +30,8 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
     // log status
     const interval = 15;
+    let logObject = roomManager.log(room);
     if (Game.time % interval == 0) {
-      let logObject = roomManager.getRoomLog(room);
       console.log(JSON.stringify(logObject));
     }
     // Address any attackers

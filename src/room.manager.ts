@@ -12,6 +12,60 @@ import roleRemoteHarvester from "role.remote.harvester";
 import roleRemoteCarrier from "role.remote.carrier";
 import { Console } from "console";
 
+
+function getRoomLog(room: Room) {
+    const rcl = room.controller?.level === undefined ? 0 : room.controller!.level;
+
+    let source0 = undefined;
+    let source1 = undefined;
+    let container0 = undefined;
+    let container1 = undefined;
+
+    if (room.memory.sortedSourcesArrayIDs.length > 0) {
+        source0 = room.memory.sortedSourcesArrayIDs[0];
+    }
+    if (room.memory.sortedSourcesArrayIDs.length > 1) {
+        source1 = room.memory.sortedSourcesArrayIDs[1];
+    }
+    if (room.memory.miningContainerIDs.length > 0) {
+        container0 = room.memory.miningContainerIDs[0];
+    }
+    if (room.memory.miningContainerIDs.length > 1) {
+        container1 = room.memory.miningContainerIDs[1];
+    }
+
+    let sourceCapacity0 = -1;
+    let sourceCapacity1 = -1;
+    let containerCapacity0 = -1;
+    let containerCapacity1 = -1;
+
+    containerCapacity0 = container0 === undefined ? -1 : Game.getObjectById(container0)?.store.energy as number;
+    containerCapacity1 = container1 === undefined ? -1 : Game.getObjectById(container1)?.store.energy as number;
+    sourceCapacity0 = source0 === undefined ? -1 : Game.getObjectById(source0)?.energy as number;
+    sourceCapacity1 = source1 === undefined ? -1 : Game.getObjectById(source1)?.energy as number;
+
+    let logObject: RoomLogItem = {
+        gameTime: Game.time,
+        roomName: room.name,
+        roomLevel: rcl,
+        isNearDecay: room.memory.isNearControllerDecay,
+        energyCapacity: room.memory.energyCapacity,
+        energyAvailable: room.memory.energyAvailable,
+        roomCreeps: room.memory.workerIDs.length + room.memory.minerIDs.length,
+        creepMap: room.memory.creepMap,
+        sourceId0: source0,
+        sourceCapacity0: sourceCapacity0,
+        sourceId1: source1,
+        sourceCapacity1: sourceCapacity1,
+        containerId0: container0,
+        containerCapacity0: containerCapacity0,
+        containerId1: container1,
+        containerCapacity1: containerCapacity1
+    }
+
+    return logObject;
+}
+
 function spawnClaimer(room: Room, targetRoom: string) {
 
     let newName = 'Claimer' + Game.time;
@@ -154,14 +208,14 @@ function getSortedSourcesArray(room: Room): Id<Source>[] {
 
 function findNeedsRepair(room: Room, FIND_TYPE: StructureConstant, threshold: number): Array<Id<Structure<STRUCTURE_ROAD | STRUCTURE_WALL | STRUCTURE_RAMPART | STRUCTURE_CONTAINER>>> {
 
-    let objs = room.find(FIND_STRUCTURES, { filter: o => (o.structureType == FIND_TYPE && o.hits <= threshold) });
+    let objs = room.find(FIND_STRUCTURES, { filter: o => (o.structureType == FIND_TYPE && o.hits <= o.hitsMax * threshold) });
     return objs.map(o => o.id) as Array<Id<Structure<STRUCTURE_ROAD | STRUCTURE_WALL | STRUCTURE_RAMPART | STRUCTURE_CONTAINER>>>;
 
 }
 
 function findRepaired(room: Room, FIND_TYPE: StructureConstant, threshold: number): Array<Id<Structure<STRUCTURE_ROAD | STRUCTURE_WALL | STRUCTURE_RAMPART | STRUCTURE_CONTAINER>>> {
 
-    let objs = room.find(FIND_STRUCTURES, { filter: object => (object.structureType == FIND_TYPE && object.hits >= threshold) });
+    let objs = room.find(FIND_STRUCTURES, { filter: object => (object.structureType == FIND_TYPE && object.hits >= object.hitsMax * threshold) });
     return objs.map(o => o.id) as Array<Id<Structure<STRUCTURE_ROAD | STRUCTURE_WALL | STRUCTURE_RAMPART | STRUCTURE_CONTAINER>>>;
 
 }
@@ -181,6 +235,9 @@ function getRepairTargets(room: Room): Array<Id<Structure>> {
     // start from existing list of repair targets
     let repairTargetsIDs = room.memory.repairTargetIDs;
 
+    let rampartThresholds = [0, 5000 / 300000, 25000 / 1000000, 50000 / 3000000, 100000 / 10000000, 200000 / 30000000, 400000 / 100000000, 1000000 / 300000000]
+    let wallThresholds = [0, 10000 / 300000000, 50000 / 300000000, 100000 / 300000000, 200000 / 300000000, 400000 / 300000000, 800000 / 300000000, 2000000 / 300000000]
+
     // remove structures that don't exist in the room anymore
     let allStructures = room.find(FIND_STRUCTURES);
     let allStructureIDs = allStructures.map(o => o.id);
@@ -188,8 +245,8 @@ function getRepairTargets(room: Room): Array<Id<Structure>> {
     _.pullAll(repairTargetsIDs, notInRoom);
 
     // get structures in need of repair (only check for roads, walls and ramparts)
-    let repairRoadIDs = findNeedsRepair(room, STRUCTURE_ROAD, ROAD_HITS * defenseConfiguration.repairThreshold);
-    let repairContainerIDs = findNeedsRepair(room, STRUCTURE_CONTAINER, CONTAINER_HITS * defenseConfiguration.repairThreshold);
+    let repairRoadIDs = findNeedsRepair(room, STRUCTURE_ROAD, 0.2);
+    let repairContainerIDs = findNeedsRepair(room, STRUCTURE_CONTAINER, defenseConfiguration.repairThreshold);
     let repairWallIDs = [];
     let repairRampartIDs = [];
 
@@ -198,22 +255,22 @@ function getRepairTargets(room: Room): Array<Id<Structure>> {
 
     // add all walls and ramparts regardless of size when room changes level
     if (room.memory.previousTickControllerLevel < rcl) {
-        repairWallIDs = findNeedsRepair(room, STRUCTURE_WALL, WALL_HITS_MAX);
-        repairRampartIDs = findNeedsRepair(room, STRUCTURE_RAMPART, RAMPART_HITS_MAX[rcl]);
+        repairWallIDs = findNeedsRepair(room, STRUCTURE_WALL, 1);
+        repairRampartIDs = findNeedsRepair(room, STRUCTURE_RAMPART, 1);
     } else {
         // otherwise, just add when they hit the repair threshold
-        repairWallIDs = findNeedsRepair(room, STRUCTURE_WALL, defenseConfiguration.wallHitPoints * defenseConfiguration.repairThreshold);
-        repairRampartIDs = findNeedsRepair(room, STRUCTURE_RAMPART, defenseConfiguration.rampartHitPoints * defenseConfiguration.repairThreshold);
+        repairWallIDs = findNeedsRepair(room, STRUCTURE_WALL, wallThresholds[rcl] * defenseConfiguration.repairThreshold);
+        repairRampartIDs = findNeedsRepair(room, STRUCTURE_RAMPART, rampartThresholds[rcl] * defenseConfiguration.repairThreshold);
     }
 
     // union the existing array with the targets we want repaired
     repairTargetsIDs = _.union(repairTargetsIDs, repairContainerIDs, repairRoadIDs, repairWallIDs, repairRampartIDs);
 
     // find the stuff that had repairs completed
-    let repairedRoadsIDs = findRepaired(room, STRUCTURE_ROAD, ROAD_HITS);
-    let repairedWallsIDs = findRepaired(room, STRUCTURE_WALL, defenseConfiguration.wallHitPoints);
-    let repairedRampartIDs = findRepaired(room, STRUCTURE_RAMPART, defenseConfiguration.rampartHitPoints);
-    let repairedContainerIDs = findRepaired(room, STRUCTURE_CONTAINER, CONTAINER_HITS);
+    let repairedRoadsIDs = findRepaired(room, STRUCTURE_ROAD, 1);
+    let repairedWallsIDs = findRepaired(room, STRUCTURE_WALL, wallThresholds[rcl]);
+    let repairedRampartIDs = findRepaired(room, STRUCTURE_RAMPART, rampartThresholds[rcl]);
+    let repairedContainerIDs = findRepaired(room, STRUCTURE_CONTAINER, 1);
 
     // remove what was already repaired from the targets
     _.pullAll(repairTargetsIDs, _.union(repairedRoadsIDs, repairedWallsIDs, repairedRampartIDs, repairedContainerIDs));
@@ -313,24 +370,24 @@ function spawnCreep(spawner: StructureSpawn, parts: Array<BodyPartConstant>,
 
 function spawnHarvester(room: Room, spawner: StructureSpawn, parts: Array<BodyPartConstant>, creepName: string, creepRoom: string = "", creepSourceIndex: number = -1) {
 
-    let counter = 0;
+    let curr1s = 0;
     let src = -1;
-    let bal = 2.0;
+    let prop1s = .5; // proportion of 1s
 
     // TODO: remove this manual adjustment
-    if (room.name == "W66S28") {
-        bal = 3.0;
-    }
+    if (room.name == "W66S28") prop1s = .75;
+    if (room.name == "W67S29") prop1s = .75;
 
     if (creepSourceIndex == -1) {
         let ci: Array<Id<Creep>> = room.memory.workerIDs;
         let c: Array<Creep> = ci.map(Game.getObjectById) as Array<Creep>;
+        let desired1s = ci.length * prop1s;
 
         for (let i = 0; i < c.length; i++) {
             if (c[i].memory.source == 1)
-                counter++;
+                curr1s++;
         }
-        if (counter > (c.length / 2.0)) // have lots of 1s
+        if (curr1s >= desired1s)
             src = 0;
         else
             src = 1;
@@ -442,6 +499,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             // should probably build walls
             objDefense.wallHitPoints = 50000;
             objDefense.rampartHitPoints = 25000;
+            objRoomCreeps.workers = 10 - numMiningContainers;
 
             if (room.name == "W67S28")
                 objRoomCreeps.workers = 12 - numMiningContainers;
@@ -455,6 +513,7 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             // bigger walls
             objDefense.wallHitPoints = 100000;
             objDefense.rampartHitPoints = 50000;
+            objRoomCreeps.workers = 8 - numMiningContainers;
 
             if (room.name == "W67S28") {
                 objRoomCreeps.workers = 10 - numMiningContainers;
@@ -472,20 +531,24 @@ function getOptimalRoomConfiguration(room: Room): RoomConfiguration {
             objDefense.wallHitPoints = 200000;
             objDefense.rampartHitPoints = 100000;
 
-            if (room.name == "W67S28") {
-                objRoomCreeps.remoteWorkers = 0;
-            }
             objRoomCreeps.workers = 8 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
+
+            if (room.name == "W67S28") {
+                objRoomCreeps.remoteWorkers = 0;
+                objRoomCreeps.workers = 6 - numMiningContainers;
+            }
             break;
         case 6:
+            objRoomCreeps.workers = 6 - numMiningContainers;
         case 7:
+            objRoomCreeps.workers = 4 - numMiningContainers;
         case 8:
             // even bigger walls
             objDefense.wallHitPoints = 400000;
             objDefense.rampartHitPoints = 200000;
 
-            objRoomCreeps.workers = 8 - numMiningContainers;
+            objRoomCreeps.workers = 4 - numMiningContainers;
             objRoomCreeps.miners = numMiningContainers;
             break;
     }
@@ -516,6 +579,35 @@ function addBuildTask(room: Room, structure: BuildableStructureConstant, x: numb
 
 var roomManager = {
 
+    processBuildTasks(room: Room) {
+
+        let currRCL = room.controller?.level === undefined ? 0 : room.controller.level;
+        // for now ignoring time
+
+        if (currRCL < room.memory.nextBuildRCL) return;
+
+        let remainingTasks: BuildTask[] = [];
+        let newMin = Infinity;
+
+        for (let i = 0; i < room.memory.buildTaskList.length; i++) {
+            let t: BuildTask = room.memory.buildTaskList[i];
+            console.log("Examining task:", JSON.stringify(t));
+
+            if (t.minRCL <= currRCL) {
+                room.createConstructionSite(t.x, t.y, t.structureType);
+            }
+            else {
+                if (t.minRCL < newMin)
+                    newMin = t.minRCL;
+                remainingTasks.push(t);
+            }
+        }
+
+        room.memory.buildTaskList = remainingTasks;
+        room.memory.nextBuildRCL = newMin;
+
+    },
+
     log: function (room: Room) {
 
         if (room.memory.roomLog === undefined)
@@ -523,6 +615,11 @@ var roomManager = {
 
         if (room.memory.roomLog.length >= 100)
             room.memory.roomLog.length = 99;
+
+        let l = getRoomLog(room);
+        room.memory.roomLog.unshift(l);
+        return l;
+
     },
 
     manualCommand: function (room: Room) {
@@ -620,25 +717,6 @@ var roomManager = {
         // energy targets
         // check if spawner is full
         room.memory.nOpenEnergyTargets = getEnergyTargets(room).length;
-    },
-
-    getRoomLog: function (room: Room) {
-
-        const rcl = room.controller?.level === undefined ? 0 : room.controller!.level;
-
-        let logObject: LogObject = {
-            gameTime: Game.time,
-            roomName: room.name,
-            roomLevel: rcl,
-            isNearDecay: room.memory.isNearControllerDecay,
-            energyCapacity: room.memory.energyCapacity,
-            energyAvailable: room.memory.energyAvailable,
-            roomCreeps: room.memory.workerIDs.length + room.memory.minerIDs.length,
-            creepMap: room.memory.creepMap,
-        }
-
-        return logObject;
-
     },
 
     defend: function (room: Room) {
@@ -777,35 +855,6 @@ var roomManager = {
 
         }
     },
-
-    processBuildTasks(room: Room) {
-
-        let currRCL = room.controller?.level === undefined ? 0 : room.controller.level;
-        // for now ignoring time
-
-        if (currRCL < room.memory.nextBuildRCL) return;
-
-        let remainingTasks: BuildTask[] = [];
-        let newMin = Infinity;
-
-        for (let i = 0; i < room.memory.buildTaskList.length; i++) {
-            let t: BuildTask = room.memory.buildTaskList[i];
-            console.log("Examining task:", JSON.stringify(t));
-
-            if (t.minRCL <= currRCL) {
-                room.createConstructionSite(t.x, t.y, t.structureType);
-            }
-            else {
-                if (t.minRCL < newMin)
-                    newMin = t.minRCL;
-                remainingTasks.push(t);
-            }
-        }
-
-        room.memory.buildTaskList = remainingTasks;
-        room.memory.nextBuildRCL = newMin;
-
-    }
 
 };
 

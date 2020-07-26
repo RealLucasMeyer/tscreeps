@@ -76,7 +76,7 @@ interface RoomMemory {
   workerIDs: Array<Id<Creep>>;
 }
 
-interface LogObject {
+interface RoomLogItem {
   gameTime: number;
   roomName: string;
   roomLevel: number;
@@ -85,7 +85,14 @@ interface LogObject {
   energyAvailable: number;
   roomCreeps: number;
   creepMap: CreepTypeCounter;
-
+  sourceId0: Id<Source> | undefined;
+  sourceCapacity0: number;
+  sourceId1: Id<Source> | undefined;
+  sourceCapacity1: number;
+  containerId0: Id<StructureContainer> | undefined;
+  containerCapacity0: number;
+  containerId1: Id<StructureContainer> | undefined;
+  containerCapacity1: number;
 }
 
 interface CreepTypeCounter {
@@ -115,15 +122,6 @@ interface ExpansionTask {
 interface ExpansionStatus {
   roomName: string;
   expansionType: string;
-}
-
-interface RoomLogItem {
-  gameTime: number;
-  sourceCapacity0: number;
-  sourceCapacity1: number;
-  containerCapacity0: number;
-  containerCapacity1: number;
-  maxAvailableEnergy: number;
 }
 
 // `global` extension samples
